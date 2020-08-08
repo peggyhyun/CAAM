@@ -1,0 +1,99 @@
+# -*- coding:utf-8 -*-
+
+'''
+---Peggy.H---
+This file is for retrieving the auto sales by enterprises released by China Association of Automobile Manufacturers (CAAM).
+***Source page: http://www.caam.org.cn/tjsj
+***Data: Pie chart under "国内数据" in the source page.
+Input: cookie. Need to manually copy from the source page.
+Output: Auto sales and a pie chart.
+'''
+
+
+
+
+
+import requests
+import urllib.request
+import urllib.parse
+from lxml import etree
+import matplotlib.pyplot as plt
+import pandas as pd
+import re
+
+
+cookie = '__xwaf_id=ba485c2028696f937e292916300e8f83548ff99c8b1dc0f7d64e0a849a64bcd1; __xwaf_ai=AklvN9komAV3QJyL'
+
+search_url = 'http://www.caam.org.cn/tjsj'
+headers = {
+'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+'Accept-encoding': 'zip, deflate',
+'Accept-language': 'zh-HK,zh-CN;q=0.9,zh;q=0.8,en;q=0.7',
+'Cache-control': 'max-age=0',
+'Cookie': cookie,
+'Host': 'www.caam.org.cn',
+'Referer': 'http://www.caam.org.cn/',
+'Upgrade-Insecure-Requests': '1',
+'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.105 Safari/537.36'
+    }
+
+
+
+resp = requests.get(search_url, headers)
+# print(resp.text)
+# print('-----------------------------------------')
+
+
+search_session = requests.Session()
+search_result = search_session.post(search_url,headers=headers)
+search_result.encoding='utf-8'
+the_page = search_result.text
+# print(the_page)
+# print('-----------------------------------------')
+
+
+tree = etree.HTML(the_page)
+search_data = tree.xpath('//script[@type="text/javascript"]/text()')
+# print(search_data)
+# print('-----------------------------------------')
+
+
+search_result = ''.join([x for x in search_data if '月企业（按集团）销量' in x])
+month = re.findall("name: \'(\d+\.?\d*)", search_result)[0]
+
+# print('-----------------------------------------')
+
+
+# for i in search_result.split(';'):
+#     print('-----------------------------------------')
+#     print(i)
+result_chart = search_result.split(';')[1].replace("var option = ",'').replace("\n","").replace("	", "").replace(" ","").split(',')
+# print(result_chart)
+
+
+data_label = ''.join([x for x in result_chart if 'data' in x])
+# print(data_label)
+data_index = result_chart.index(data_label)
+data_string = result_chart[data_index:]
+# print(data_string)
+
+
+auto_name = []
+auto_sales = []
+for i in data_string:
+    if len(re.findall(r"\d+\.?\d*",i)) != 0:
+        auto_sales.append(''.join(re.findall(r"\d+\.?\d*",i)))
+    if len(re.findall(re.compile('[\u4e00-\u9fa5]'),i)) != 0:
+        auto_name.append(''.join(re.findall(re.compile('[\u4e00-\u9fa5]'),i)))
+# print(auto_name, auto_sales)
+
+
+df_auto = pd.DataFrame(pd.to_numeric(auto_sales), index=auto_name, columns=[str(month)+'月企业（按集团）销量'])
+print(df_auto)
+
+
+plt.rcParams['font.sans-serif'] = ['KaiTi']
+plt.rcParams['font.serif'] = ['KaiTi']
+df_auto.plot(kind='pie', subplots=True, autopct='%.2f', legend = False)
+plt.tight_layout()
+plt.show()
